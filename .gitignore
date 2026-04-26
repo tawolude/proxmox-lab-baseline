@@ -1,0 +1,26 @@
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Office lock files (we live in OneDrive)
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# Secrets — never commit
+*.env
+*.pem
+*.key
+secrets/
+config/local.*
+
+# pfSense exports may contain sensitive data — sanitise before committing
+pfsense-config-*.xml
+!pfsense-config-sanitised.xml
