@@ -132,3 +132,153 @@ In the Windows installer:
 ### Lesson
 
 Always mount the VirtIO drivers ISO as a second CD before first boot of a Windows VM on Proxmox. It costs nothing if not used; saves a 30-minute reinstall if forgotten.
+
+---
+
+## Domain join + rename race in `Add-Computer`
+
+### Symptom
+
+Running this on a fresh Win11 VM:
+
+```powershell
+Rename-Computer -NewName "Win11-User01" -Force
+Add-Computer -DomainName "lab.local" -Restart -Force
+```
+
+The domain join succeeds, but after reboot the hostname is still the auto-generated `DESKTOP-XXXXXXX`. The rename was silently dropped.
+
+### Diagnosis
+
+`Rename-Computer` without `-Restart` only **queues** the rename for next boot. `Add-Computer -Restart` then triggers the reboot, but the join operation registers the AD computer object using the **current** (unrenamed) hostname before the queued rename can apply. The rename queue is then either lost or overridden by the join machinery.
+
+The result: AD has a computer object under the auto-generated name, locally the machine still has the auto-generated name, but the rename "ran" so nobody errored.
+
+### Fix
+
+Use `Add-Computer -NewName <name>` to perform the join and rename **atomically** in one cmdlet call:
+
+```powershell
+Add-Computer -DomainName "lab.local" -NewName "Win11-User01" -Restart -Force
+```
+
+This is the cmdlet's intended pattern for new-build domain joins. No race, single AD object, correct hostname after reboot.
+
+### Lesson
+
+For greenfield domain joins, never separate `Rename-Computer` and `Add-Computer`. Use `Add-Computer -NewName` for an atomic operation. The two-step approach is only valid for already-joined computers being renamed — and even then, use `Rename-Computer -DomainCredential` so AD updates in lockstep with the local SAM.
+
+---
+
+## Orphan AD computer objects after a failed atomic join
+
+### Symptom
+
+After a failed `Add-Computer -NewName` cycle, retrying produces:
+
+```
+Add-Computer : Computer 'DESKTOP-EALOFVH' was successfully joined to the new
+domain 'lab.local', but renaming it to 'Win11-User01' failed with the following
+error message: The account already exists.
+```
+
+Or on a clean rollback + retry:
+
+```
+Add-Computer : Cannot add computer 'DESKTOP-EALOFVH' to domain 'lab.local'
+because it is already in that domain.
+```
+
+### Diagnosis
+
+The previous failed cycle created an AD computer object under the intended name (`Win11-User01`) even though the local rename never applied. That object persists across local rollback, blocks the new attempt's rename, and leaves the local machine in a half-joined state with no matching AD object.
+
+### Fix
+
+Two-step recovery, in this order:
+
+1. **On DC01**, delete the orphan object — by exact name only, never by wildcard:
+
+   ```powershell
+   Get-ADComputer -Identity "Win11-User01" | Remove-ADComputer -Confirm:$false
+   ```
+
+2. **On the client**, roll back to the pre-join Proxmox snapshot, then re-run the atomic join:
+
+   ```powershell
+   Add-Computer -DomainName "lab.local" -NewName "Win11-User01" -Restart -Force
+   ```
+
+### Anti-pattern that bit hard
+
+This wildcard cleanup looks helpful but is dangerous:
+
+```powershell
+# WRONG — matches the freshly-joined live machine too
+Get-ADComputer -Filter "Name -like 'DESKTOP-*'" | Remove-ADComputer -Confirm:$false
+```
+
+Auto-generated Windows hostnames all start with `DESKTOP-`. A wildcard that matches "orphans" will also match a live machine that hasn't been renamed yet, deleting its AD object and breaking the secure channel.
+
+### Lesson
+
+Always identify orphan AD objects by their exact name. Never use `-like 'DESKTOP-*'` or any other wildcard for object deletion. If a clean orphan-free state is needed, list and verify before deleting:
+
+```powershell
+Get-ADComputer -Filter * | Select-Object Name, Created, Modified | Sort-Object Created
+```
+
+Then delete by `-Identity "ExactName"` only.
+
+---
+
+## Force-restart corrupts Win11 boot configuration
+
+### Symptom
+
+Running `Restart-Computer -Force` on a Win11 VM after registry / service config changes drops the VM into the Windows Recovery Environment loop ("Diagnosing your PC", endless restart attempts, no successful boot).
+
+### Diagnosis
+
+`Restart-Computer -Force` calls `InitiateSystemShutdownEx` with the force flag, killing processes that don't acknowledge the shutdown request within ~5 seconds. With paravirt VirtIO drivers and pending writes to the registry / Boot Configuration Data store (e.g. immediately after `Set-Service` / `Set-ItemProperty`), the kernel doesn't get to flush in order. The boot config ends up partially written, and the bootloader can't reconcile it.
+
+### Fix
+
+1. Proxmox: VM → **Stop** (force-kill the looping VM)
+2. Snapshots → roll back to the last known-good snapshot
+3. Re-apply changes
+4. Reboot via the **Start menu → Power → Restart** — never via `Restart-Computer -Force`
+
+The Start-menu restart issues `WM_QUERYENDSESSION`, which respects the kernel's flush ordering.
+
+### Lesson
+
+For Win11 lab VMs, the rule is: graceful restart only. Use the Start menu, or `Restart-Computer` without `-Force`, and only fall back to `-Force` when the VM is already wedged. Pair this rule with frequent snapshots so an unexpected boot loop is a 60-second rollback, not a reinstall.
+
+---
+
+## "Sign in to: LAB" on a domain-joined Windows — local logon needs `.\` prefix
+
+### Symptom
+
+On a domain-joined Win11 client at the login screen, typing `labadmin` (the local administrator account) into "Other user" produces a login failure. The text under the password field reads **`Sign in to: LAB`**.
+
+### Diagnosis
+
+Bare usernames at the login screen default to the domain. Windows tries `LAB\labadmin`, which doesn't exist in AD, and rejects it. The local account `WIN11-USERnn\labadmin` is never queried.
+
+### Fix
+
+Prefix the username with `.\` to force the local SAM:
+
+| Username typed | Resolved to |
+|---|---|
+| `labadmin` | `LAB\labadmin` (fails — no domain account) |
+| `.\labadmin` | `<computername>\labadmin` (local SAM, works) |
+| `WIN11-USER01\labadmin` | Same as above, more explicit |
+
+The "Sign in to:" line below the password should flip from `LAB` to the computer name when the prefix is correct.
+
+### Lesson
+
+On any domain-joined Windows machine, `.\username` is the universal way to log in as a local account. Worth memorising — it's the same trick on Win10, Win11, Server 2016/2019/2022/2025.
