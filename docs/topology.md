@@ -4,36 +4,50 @@
 
 A flat lab LAN behind pfSense. All VMs share `192.168.1.0/24`. VLAN segmentation is deferred — see "Planned" section below.
 
-```
-                        Home router
-                       192.168.0.1
-                            │
-                            │  (Cat6 → P50 onboard NIC)
-                            │
-                  ┌─────────┴──────────┐
-                  │    Proxmox host    │ 192.168.0.171
-                  │   (vmbr0 master)   │
-                  └─────────┬──────────┘
-                            │
-                            │  vmbr0 (WAN bridge — physical NIC)
-                            │
-                  ┌─────────┴──────────┐
-                  │   pfSense VM 100   │
-                  │  WAN: 192.168.0.177│  (DHCP from home router)
-                  │  LAN: 192.168.1.1  │  (static, DHCP server, DNS forwarder)
-                  └─────────┬──────────┘
-                            │
-                            │  vmbr1 (LAN bridge — virtual-only, no physical port)
-                            │
-        ┌───────────────────┼─────────────────────┬─────────────────────┐
-        │                   │                     │                     │
-   ┌────┴─────┐      ┌─────┴──────┐      ┌─────────┴────────┐    ┌────┴────────────┐
-   │ lan-test │      │   DC01     │      │ Win11-User01/02  │    │   (future)      │
-   │   LXC    │      │ 192.168.   │      │       /03        │    │   Wazuh,        │
-   │ 192.168. │      │   1.10     │      │ DHCP from pfSense│    │   MISP,         │
-   │  1.101   │      │ AD + DNS   │      │ Domain-joined    │    │   TheHive,      │
-   │ canary   │      │ lab.local  │      │ to lab.local     │    │   Velociraptor… │
-   └──────────┘      └────────────┘      └──────────────────┘    └─────────────────┘
+```mermaid
+flowchart TB
+    Internet([Internet])
+    Router["Home router<br/>192.168.0.1"]
+
+    subgraph proxmox["Proxmox host — 192.168.0.171"]
+        direction TB
+        vmbr0[/"vmbr0 — WAN bridge<br/>(physical NIC)"/]
+
+        subgraph pfsense["pfSense VM 100"]
+            direction TB
+            wan["WAN — vtnet0<br/>192.168.0.177 / DHCP"]
+            lan["LAN — vtnet1<br/>192.168.1.1 / static<br/>DHCP server + DNS forwarder<br/>lab.local domain override"]
+        end
+
+        vmbr1[/"vmbr1 — LAN bridge<br/>(virtual-only, no physical port)"/]
+
+        lantest["lan-test (LXC 101)<br/>192.168.1.101<br/>Layer-2 diagnostic canary"]
+        dc01["DC01 (VM 102)<br/>192.168.1.10 / static<br/>AD DS + DNS for lab.local"]
+        user01["Win11-User01 (VM 110)<br/>DHCP, domain-joined"]
+        user02["Win11-User02 (VM 111)<br/>DHCP, domain-joined"]
+        user03["Win11-User03 (VM 112)<br/>DHCP, domain-joined<br/>(legacy / unmanaged role)"]
+    end
+
+    Internet --> Router
+    Router -->|cat6 → P50 onboard NIC| vmbr0
+    vmbr0 --> wan
+    wan -.routes.- lan
+    lan --> vmbr1
+    vmbr1 --> lantest
+    vmbr1 --> dc01
+    vmbr1 --> user01
+    vmbr1 --> user02
+    vmbr1 --> user03
+
+    classDef extNode  fill:#f9fafb,stroke:#4b5563,color:#111827
+    classDef wanNode  fill:#fff7ed,stroke:#ea580c,color:#7c2d12
+    classDef lanNode  fill:#eff6ff,stroke:#2563eb,color:#1e3a8a
+    classDef fwNode   fill:#fef2f2,stroke:#dc2626,color:#7f1d1d
+
+    class Internet,Router extNode
+    class vmbr0,wan wanNode
+    class lan,vmbr1,lantest,dc01,user01,user02,user03 lanNode
+    class pfsense fwNode
 ```
 
 ## Planned state (after VLAN segmentation lands)
