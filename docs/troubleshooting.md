@@ -322,3 +322,52 @@ Low CVE counts on recently-released OS builds are not a signal of a patched / cl
 ### Real-world implication
 
 SOC analysts triaging vulnerability findings on new OS builds should cross-reference vendor-native tools (Microsoft Defender Vulnerability Management, Microsoft's own MSRC search by KB / OS version) before concluding an endpoint is patched. The dashboard is a starting point, not a verdict.
+
+---
+
+## Pasting heredocs after `sudo` eats the password prompt
+
+### Symptom
+
+Pasting a multi-line block like this into an SSH session:
+
+```bash
+sudo tee -a /var/ossec/etc/ossec.conf > /dev/null << 'EOF'
+<config>
+  <line>...</line>
+</config>
+EOF
+```
+
+…fails with `sudo: Authentication failed, try again` repeated until lockout. The heredoc content shows up corrupted in the file — fragments of `[sudo: authenticate] Password:` injected mid-line, partial XML written.
+
+### Diagnosis
+
+When the paste arrives, sudo immediately prompts for a password. The terminal feeds the *next* lines of the paste (the heredoc content) into stdin as if they were the password. sudo treats the first chunk as a wrong password, retries, fails, retries, fails — three failures triggers a 5-minute lockout. Meanwhile some of the heredoc has already partially written to the file.
+
+Root cause: `sudo` and clipboard-paste don't share a sane input stream when the password prompt is the first thing the terminal asks for in a paste.
+
+### Fix — pre-authenticate sudo or become root first
+
+**Option A** — cache sudo creds with a no-op before pasting:
+
+```bash
+sudo true   # type password ONCE
+# now paste the heredoc; sudo skips the prompt for ~15 min
+```
+
+**Option B** — become root once and drop the sudo prefix:
+
+```bash
+sudo -i     # password ONCE; prompt changes to root@host:~#
+cat >> /etc/somefile.conf << 'EOF'
+content
+EOF
+exit        # back to normal user
+```
+
+Option B is cleaner for any multi-step config session. Don't forget the `exit` at the end.
+
+### Lesson
+
+For any non-trivial config session over SSH, pre-authenticate sudo before pasting heredocs. Even better: become root for the duration. The "paste = silent input stream" trap is one of those things you only learn the hard way.
