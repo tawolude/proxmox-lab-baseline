@@ -282,3 +282,43 @@ The "Sign in to:" line below the password should flip from `LAB` to the computer
 ### Lesson
 
 On any domain-joined Windows machine, `.\username` is the universal way to log in as a local account. Worth memorising — it's the same trick on Win10, Win11, Server 2016/2019/2022/2025.
+
+---
+
+## Vulnerability detection coverage gap on Win11 24H2 (build 26200)
+
+### Symptom
+
+Wazuh's Vulnerability Detection module flags **1,602 CVEs on DC01** (Windows Server 2022) but only **2 on Win11-User01** (Windows 11 24H2 build 26200) — both CVEs are for the QEMU guest agent, not Windows itself. Both hosts have Windows Update blocked at pfSense level, so the patching baseline is effectively identical. The disparity is implausible if you read the dashboard at face value.
+
+### Diagnosis
+
+The agent is healthy on Win11-User01:
+
+- Status: active, ~85 MITRE ATT&CK detections per hour
+- System inventory populated (cores, memory, CPU, hostname all reported correctly)
+- FIM events flowing in real time on the directories configured in Phase G
+- Sysmon telemetry visible in Threat Hunting
+- Syscollector is working — the agent's package inventory is being reported
+
+If syscollector were broken, none of those modules would be feeding. They are. So the integration end-to-end is fine.
+
+The gap is at the **CPE-matching layer against the upstream NVD + MSRC feeds**. Win11 24H2 (build 26100/26200, released October 2024) doesn't yet have broad CPE entries that Wazuh can match against. Server 2022 has been around since 2021 and has thorough back-mapped coverage.
+
+### Confirmation
+
+Direct query of the agent's syscollector database on Wazuh01 confirmed Win11-User01 reports a normal-looking package inventory:
+
+```bash
+sudo sqlite3 /var/ossec/queue/db/002.db "SELECT COUNT(*) FROM sys_programs;"
+```
+
+Inventory present, vulnerability matches absent — feed gap, not agent gap.
+
+### Lesson
+
+Low CVE counts on recently-released OS builds are not a signal of a patched / clean state — they are often a feed-coverage artefact. The same gap affects every scanner that relies on NVD/MSRC CPE matching (Tenable Nessus, Qualys, OpenVAS, Wazuh).
+
+### Real-world implication
+
+SOC analysts triaging vulnerability findings on new OS builds should cross-reference vendor-native tools (Microsoft Defender Vulnerability Management, Microsoft's own MSRC search by KB / OS version) before concluding an endpoint is patched. The dashboard is a starting point, not a verdict.
