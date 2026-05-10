@@ -14,12 +14,15 @@ Full project index and write-ups: <https://oluwatobiawolude.co.uk/#projects>
 | Active Directory `lab.local` | Deployed | DC01 — Windows Server 2022, internal DNS forwarding to pfSense |
 | OUs + 11 seeded users | Deployed | IT, Finance, HR, ServiceAccounts (with SPNs for Kerberoast practice) |
 | Win11 endpoints (3) | In progress | Win11-User01/02/03, domain-joined, one modeling legacy/unmanaged |
+| Wazuh SIEM / Project 1 | In progress | Wazuh01 at `192.168.1.20`; manager + indexer + dashboard; DC01/Win11 telemetry work underway |
+| pfSense syslog to Wazuh | In progress | UDP 514 forwarding worked on; verify live config before relying on it |
 | pfSense VLAN segmentation | Deferred | Pending managed switch or virtual VLAN config |
-| Suricata IDS on WAN | Deferred | Rolls in with Wazuh in Project 1 |
+| Suricata IDS on WAN | Deferred | Future enhancement after Wazuh baseline |
 
 ## Repo layout
 
 - [`docs/`](docs/) — design and operational notes
+  - [`current-state.md`](docs/current-state.md) — quickest handoff for Claude/ChatGPT/Codex continuity
   - [`topology.md`](docs/topology.md) — current network and the planned VLAN end-state
   - [`troubleshooting.md`](docs/troubleshooting.md) — gotchas hit during build with diagnoses and fixes
 - [`scripts/`](scripts/) — PowerShell, Bash, and pfSense snippets

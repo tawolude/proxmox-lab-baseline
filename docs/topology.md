@@ -23,7 +23,8 @@ flowchart TB
 
         lantest["lan-test (LXC 101)<br/>192.168.1.101<br/>Layer-2 diagnostic canary"]
         dc01["DC01 (VM 102)<br/>192.168.1.10 / static<br/>AD DS + DNS for lab.local"]
-        user01["Win11-User01 (VM 110)<br/>DHCP, domain-joined"]
+        wazuh01["Wazuh01<br/>192.168.1.20 / static<br/>Manager + indexer + dashboard"]
+        user01["Win11-User01 (VM 110)<br/>DHCP, domain-joined<br/>Wazuh agent + Sysmon/FIM"]
         user02["Win11-User02 (VM 111)<br/>DHCP, domain-joined"]
         user03["Win11-User03 (VM 112)<br/>DHCP, domain-joined<br/>(legacy / unmanaged role)"]
     end
@@ -35,6 +36,7 @@ flowchart TB
     lan --> vmbr1
     vmbr1 --> lantest
     vmbr1 --> dc01
+    vmbr1 --> wazuh01
     vmbr1 --> user01
     vmbr1 --> user02
     vmbr1 --> user03
@@ -46,7 +48,7 @@ flowchart TB
 
     class Internet,Router extNode
     class vmbr0,wan wanNode
-    class lan,vmbr1,lantest,dc01,user01,user02,user03 lanNode
+    class lan,vmbr1,lantest,dc01,wazuh01,user01,user02,user03 lanNode
     class pfsense fwNode
 ```
 
@@ -66,7 +68,7 @@ WAN ─── pfSense ─┬── MGMT VLAN 10 (Proxmox host, admin workstation
 | Segment | CIDR | Purpose | Examples |
 |---|---|---|---|
 | WAN (home network) | `192.168.0.0/24` | Upstream of pfSense | Home router `.1`, Proxmox `.171`, pfSense WAN `.177` |
-| LAN (current flat) | `192.168.1.0/24` | All lab traffic | pfSense LAN `.1`, DC01 `.10`, lan-test `.101`, DHCP pool `.100–.245` |
+| LAN (current flat) | `192.168.1.0/24` | All lab traffic | pfSense LAN `.1`, DC01 `.10`, Wazuh01 `.20`, lan-test `.101`, DHCP pool `.100–.245` |
 | MGMT VLAN 10 (planned) | `10.10.10.0/24` | Out-of-band management | Proxmox host, admin jump box |
 | CORP VLAN 20 (planned) | `10.10.20.0/24` | Endpoints + AD | DC01, Win clients, file server |
 | SEC VLAN 30 (planned) | `10.10.30.0/24` | SOC tooling | Wazuh, MISP, TheHive, Velociraptor, Cortex |
