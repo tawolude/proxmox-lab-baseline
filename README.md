@@ -21,6 +21,7 @@ Full project index and write-ups: <https://oluwatobiawolude.co.uk/#projects>
 
 ## Repo layout
 
+- [`HANDOFF.md`](HANDOFF.md) — live baton file for Claude/Codex/ChatGPT token-limit handover
 - [`docs/`](docs/) — design and operational notes
   - [`current-state.md`](docs/current-state.md) — quickest handoff for Claude/ChatGPT/Codex continuity
   - [`topology.md`](docs/topology.md) — current network and the planned VLAN end-state

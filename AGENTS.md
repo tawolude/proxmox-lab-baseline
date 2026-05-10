@@ -58,12 +58,31 @@ See `docs/current-state.md` for the detailed handoff. Short version:
 
 Before making changes:
 
-1. Read `README.md`.
-2. Read `docs/current-state.md`.
-3. Read `docs/topology.md`.
-4. Read `docs/troubleshooting.md`, especially the latest Wazuh/Win11 entries.
-5. Run `git status` and do not overwrite uncommitted human work.
-6. If using Codex CLI, run from this repo root so this `AGENTS.md` is loaded.
+1. Read `HANDOFF.md` first — it is the live baton between Claude, Codex, and ChatGPT.
+2. Read `README.md`.
+3. Read `docs/current-state.md`.
+4. Read `docs/topology.md`.
+5. Read `docs/troubleshooting.md`, especially the latest Wazuh/Win11 entries.
+6. Run `git status --short` and do not overwrite uncommitted human or agent work.
+7. If using Codex CLI, run from this repo root so this `AGENTS.md` is loaded.
+
+## Token-limit / agent-switch protocol
+
+If context is getting low, the agent must preserve a clean handoff before continuing:
+
+1. Stop starting new work.
+2. Run `git status --short` and `git diff --stat`.
+3. Update `HANDOFF.md` with:
+   - task attempted
+   - files changed
+   - commands run and results
+   - checks/tests passed or failed
+   - blockers and assumptions
+   - exact next safe step
+4. Commit safe, coherent changes. If not safe to commit, explain why in `HANDOFF.md`.
+5. Tell Tobi to open the other agent and use the resume prompt in `HANDOFF.md`.
+
+The next agent must treat `HANDOFF.md` plus the git state as source of truth, not stale chat memory.
 
 Recommended next documentation tasks:
 

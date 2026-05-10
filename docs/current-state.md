@@ -6,6 +6,8 @@ Last updated by Hermes for ChatGPT/Codex continuity.
 
 This is the single quickest catch-up document for a new assistant. It captures the latest known lab state from the repo plus Claude Code conversation history so ChatGPT/Codex can continue if Claude cannot.
 
+For **live baton-passing during token/context limits**, use root-level [`HANDOFF.md`](../HANDOFF.md). `HANDOFF.md` should be updated at the end of every agent session or before switching between Claude and Codex.
+
 ## Repository
 
 - Local path: `/mnt/c/Users/Strawhat/OneDrive/CVs and Covering letters/2025/proxmox-lab-baseline`
@@ -226,4 +228,4 @@ The repo currently needs documentation to catch up with Project 1. Good next cha
 
 If a new ChatGPT/Codex session needs to continue the work, start with:
 
-> You are continuing Tobi's Proxmox blue-team home lab repo. Read `AGENTS.md`, `README.md`, `docs/current-state.md`, `docs/topology.md`, and `docs/troubleshooting.md` first. Do not make live lab changes unless explicitly asked. Preserve intentional vulnerabilities. Update docs as you go. Current priority is to document/continue Project 1 Wazuh at `192.168.1.20` and keep the repo accurate enough that Claude, ChatGPT, or Codex can hand off cleanly.
+> You are continuing Tobi's Proxmox blue-team home lab repo after another AI agent hit token/context limits. Read `AGENTS.md`, `HANDOFF.md`, `docs/current-state.md`, `README.md`, `docs/topology.md`, and `docs/troubleshooting.md` first. Run `git status --short` before editing anything. Continue from `HANDOFF.md`, preserve intentional vulnerabilities, and do not make live Proxmox/pfSense/AD/Wazuh changes unless explicitly asked. Keep `HANDOFF.md` updated so Claude, ChatGPT, or Codex can take over cleanly again.
